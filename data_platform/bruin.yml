@@ -1,0 +1,66 @@
+name: omniflow-ecommerce-platform
+version: "1.0.0"
+
+environments:
+  default:
+    type: duckdb
+    path: ./data_warehouse/warehouse.duckdb
+
+  postgres:
+    type: postgres
+    host: localhost
+    port: 5432
+    database: ecommerce_warehouse
+    username: omni_admin
+    password: omni_secret_pass
+
+  gcp_bigquery:
+    type: bigquery
+    project: omniflow-de-project
+    dataset: ecommerce_analytics
+
+schedule:
+  cron: "0 2 * * *" # Daily at 2 AM UTC
+
+assets:
+  - name: raw_orders
+    type: duckdb.table
+    description: "Raw streaming orders ingested from Kafka to Data Lake and mirrored in Warehouse"
+    columns:
+      - name: order_id
+        type: varchar
+        checks:
+          - name: not_null
+          - name: unique
+      - name: total_amount
+        type: double
+        checks:
+          - name: positive
+
+  - name: dim_customers
+    type: duckdb.table
+    description: "Customer dimensional model with lifetime metrics"
+    depends_on:
+      - raw_orders
+      - ecommerce_raw.customers
+    columns:
+      - name: customer_id
+        type: varchar
+        checks:
+          - name: not_null
+          - name: unique
+
+  - name: fct_daily_sales
+    type: duckdb.table
+    description: "Daily aggregated sales and fraud monitoring"
+    depends_on:
+      - raw_orders
+    columns:
+      - name: order_date
+        type: date
+        checks:
+          - name: not_null
+      - name: net_revenue
+        type: double
+        checks:
+          - name: positive

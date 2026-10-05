@@ -1,0 +1,224 @@
+services:
+  # =========================================================================
+  # MODULE 1: PostgreSQL (Relational Source & Warehouse)
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: omniflow-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-omni_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omni_secret_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_warehouse}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-omni_admin} -d ${POSTGRES_DB:-ecommerce_warehouse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - omniflow-network
+
+  # =========================================================================
+  # MODULE 7: Apache Kafka (KRaft mode - no zookeeper required)
+  # =========================================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: omniflow-kafka
+    restart: always
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - omniflow-network
+
+  # Kafka UI - Interactive topic and message browser
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: omniflow-kafka-ui
+    restart: always
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      - kafka
+    networks:
+      - omniflow-network
+
+  # =========================================================================
+  # MODULE 7 / SINK: MinIO (S3-compatible Data Lake)
+  # =========================================================================
+  minio:
+    image: minio/minio:RELEASE.2024-05-10T01-41-38Z
+    container_name: omniflow-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - omniflow-network
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-05-09T17-04-24Z
+    container_name: omniflow-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/ecommerce-lake;
+      /usr/bin/mc mb myminio/ecommerce-lake/raw;
+      /usr/bin/mc mb myminio/ecommerce-lake/silver;
+      /usr/bin/mc mb myminio/ecommerce-lake/gold;
+      exit 0;
+      "
+    networks:
+      - omniflow-network
+
+  # =========================================================================
+  # MODULE 2: Kestra (Modern Workflow Orchestration)
+  # =========================================================================
+  kestra:
+    image: kestra/kestra:v0.18.2
+    container_name: omniflow-kestra
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      KESTRA_CONFIGURATION: |
+        kestra:
+          server:
+            basic-auth:
+              enabled: false
+          repository:
+            type: postgres
+          queue:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: /app/storage
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ecommerce_warehouse}
+            driver-class-name: org.postgresql.Driver
+            username: ${POSTGRES_USER:-omni_admin}
+            password: ${POSTGRES_PASSWORD:-omni_secret_pass}
+    volumes:
+      - kestra_storage:/app/storage
+      - ./orchestration/flows:/app/flows
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - omniflow-network
+
+  # =========================================================================
+  # MODULE 6: Apache Spark (Batch Processing Cluster)
+  # =========================================================================
+  spark-master:
+    image: bitnami/spark:3.5.1
+    container_name: omniflow-spark-master
+    restart: always
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "7077:7077"
+      - "8082:8080"
+    volumes:
+      - ./batch:/opt/bitnami/spark/jobs
+      - ./data_lake:/opt/bitnami/spark/data_lake
+    networks:
+      - omniflow-network
+
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    container_name: omniflow-spark-worker
+    restart: always
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8083:8081"
+    depends_on:
+      - spark-master
+    volumes:
+      - ./batch:/opt/bitnami/spark/jobs
+      - ./data_lake:/opt/bitnami/spark/data_lake
+    networks:
+      - omniflow-network
+
+  # =========================================================================
+  # MODULE 5: Executive Analytics Dashboard (Streamlit)
+  # =========================================================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: omniflow-dashboard
+    restart: always
+    ports:
+      - "8501:8501"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=omni_admin
+      - POSTGRES_PASSWORD=omni_secret_pass
+      - POSTGRES_DB=ecommerce_warehouse
+      - KAFKA_BROKER=kafka:29092
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+    networks:
+      - omniflow-network
+
+networks:
+  omniflow-network:
+    name: omniflow-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+  kafka_data:
+  minio_data:
+  kestra_storage:

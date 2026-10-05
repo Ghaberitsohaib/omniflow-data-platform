@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Cleaned and typed streaming orders"
+    columns:
+      - name: order_id
+        description: "Primary key for orders"
+        tests:
+          - unique
+          - not_null
+      - name: total_amount_usd
+        description: "Total order amount in USD"
+        tests:
+          - not_null
+
+  - name: dim_customers
+    description: "Customer dimension with lifetime spend and order metrics"
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_daily_sales
+    description: "Daily aggregated sales performance mart"
+    columns:
+      - name: order_date
+        tests:
+          - not_null
+      - name: net_revenue
+        tests:
+          - not_null

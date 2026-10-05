@@ -1,0 +1,11 @@
+id: 02_kafka_streaming
+namespace: omniflow.streaming
+description: "Ingests live streaming events from Kafka / buffer into partitioned Data Lake"
+
+tasks:
+  - id: consume_and_sink_lake
+    type: io.kestra.plugin.scripts.python.Commands
+    runner: PROCESS
+    commands:
+      - python streaming/consumer_to_lake.py
+      - python streaming/fraud_detector.py

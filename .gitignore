@@ -1,0 +1,59 @@
+# Environment variables
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data Lake & Warehouses
+data_lake/
+data_warehouse/
+*.duckdb
+*.duckdb.wal
+lakehouse/
+warehouse.db
+dev.duckdb
+*.parquet
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# dlt
+.dlt/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# MinIO & Kafka data mounts
+minio_data/
+kafka_data/
+postgres_data/

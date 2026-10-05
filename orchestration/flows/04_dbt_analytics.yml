@@ -1,0 +1,10 @@
+id: 04_dbt_analytics
+namespace: omniflow.analytics
+description: "Runs dbt staging, dimensional & fact marts, and data quality tests"
+
+tasks:
+  - id: dbt_build_and_test
+    type: io.kestra.plugin.scripts.python.Commands
+    runner: PROCESS
+    commands:
+      - python analytics_dbt/run_dbt.py

@@ -1,0 +1,15 @@
+id: 01_dlt_ingestion
+namespace: omniflow.etl
+description: "Triggers dltHub ingestion from API endpoints into Lake & Warehouse"
+
+tasks:
+  - id: run_dlt_pipeline
+    type: io.kestra.plugin.scripts.python.Commands
+    runner: PROCESS
+    commands:
+      - python ingestion/dlt_pipeline.py duckdb
+
+triggers:
+  - id: hourly_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 * * * *"

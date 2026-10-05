@@ -1,0 +1,28 @@
+id: 00_master_end_to_end
+namespace: omniflow.orchestration
+description: "Master End-to-End Orchestrator: Ingest -> Stream -> Batch -> dbt Marts"
+
+tasks:
+  - id: step_1_dlt_ingestion
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: omniflow.etl
+    flowId: 01_dlt_ingestion
+    wait: true
+
+  - id: step_2_streaming_lake_sink
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: omniflow.streaming
+    flowId: 02_kafka_streaming
+    wait: true
+
+  - id: step_3_spark_batch
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: omniflow.batch
+    flowId: 03_spark_batch
+    wait: true
+
+  - id: step_4_dbt_analytics
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: omniflow.analytics
+    flowId: 04_dbt_analytics
+    wait: true

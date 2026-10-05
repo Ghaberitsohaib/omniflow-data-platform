@@ -1,0 +1,27 @@
+omniflow_profile:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../data_warehouse/warehouse.duckdb"
+      schema: analytics
+      threads: 4
+
+    postgres:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      user: "{{ env_var('POSTGRES_USER', 'omni_admin') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'omni_secret_pass') }}"
+      port: 5432
+      dbname: "{{ env_var('POSTGRES_DB', 'ecommerce_warehouse') }}"
+      schema: analytics
+      threads: 4
+
+    prod_bigquery:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID', 'omniflow-de-project') }}"
+      dataset: "{{ env_var('GCP_BIGQUERY_DATASET', 'ecommerce_analytics') }}"
+      threads: 4
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', 'keyfile.json') }}"
+      location: "{{ env_var('GCP_REGION', 'europe-west1') }}"
