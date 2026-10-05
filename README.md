@@ -8,6 +8,7 @@
 [![dbt](https://img.shields.io/badge/dbt-Analytics_Engineering-FF694B?style=for-the-badge&logo=dbt&logoColor=white)](https://www.getdbt.com/)
 [![Apache Spark](https://img.shields.io/badge/Apache_Spark-Batch_Processing-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)](https://spark.apache.org/)
 [![BigQuery](https://img.shields.io/badge/Google_BigQuery-Cloud_Warehouse-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com/bigquery)
+[![CI](https://github.com/Ghaberitsohaib/omniflow-data-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Ghaberitsohaib/omniflow-data-platform/actions/workflows/ci.yml)
 
 > **OmniFlow** is a complete, production-grade end-to-end Data Engineering pipeline built according to the **DataTalksClub Data Engineering Zoomcamp** architecture. It ingests high-frequency real-time e-commerce transactions, clickstream events, and REST API catalogs, lands them in a partitioned Data Lake, orchestrates workflows, runs distributed batch aggregations, builds dimensional models with dbt, and surfaces executive analytics.
 
